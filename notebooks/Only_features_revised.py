@@ -18,7 +18,6 @@ import pandas as pd
 import dissonant
 import os
 import scipy
-import spleeter
 import numpy as np
 import mir_eval
 import crepe
@@ -48,7 +47,7 @@ import glob
 
 
 from mosqito.utils import load
-from mosqito.sq_metrics import *
+from mosqito import sq_metrics
 
 from mosqito import COLORS
 
@@ -71,20 +70,18 @@ def tempo_extraction(y, sr, start_bpm = 80):
     #Constant Q-spectrogram
     C = np.abs(librosa.cqt(y=y, sr=sr))
     o_env3 = librosa.onset.onset_strength(sr=sr,S = librosa.amplitude_to_db(C, ref=np.max))
-    
     times3 = librosa.frames_to_time(np.arange(len(o_env3)), sr=sr)
-
-
-
     # Obtain dynamic tempo
     dtempo3 = librosa.beat.tempo(y = y, sr = sr, onset_envelope = o_env3, aggregate = None, start_bpm = start_bpm)
     #t = librosa.frames_to_time(np.arange(len(dtempo3)))
-    
-
-    
     return dtempo3, times3
 
 
+def mean_tempo_extraction(y, sr):
+    C = np.abs(librosa.cqt(y=y, sr=sr))
+    o_env3 = librosa.onset.onset_strength(sr=sr,S = librosa.amplitude_to_db(C, ref=np.max))
+    tempo3 = librosa.beat.tempo(y = y, sr = sr, onset_envelope = o_env3)
+    return tempo3
 
 # In[ ]:
 def noteToFreq(note):
@@ -221,12 +218,15 @@ def onset_evaluation(onset_envelope,y,sr):
 
 
 # Calculate loudness
-def extract_loudness(outpath, file_name):
+def extract_loudness(outpath, file_name, trim=False):
     print("Estimating loudness...")
-    
-    sig, fs = load(outpath + file_name + "_trim"+ ".wav")
+    if trim:
+        f = outpath + file_name + "_trim"+ ".wav"
+    else:
+        f = outpath + file_name
+    sig, fs = load(f)
 
-    loudness, N_spec, bark_axis, t = loudness_zwtv(sig, fs, field_type="free")
+    loudness, N_spec, bark_axis, t = sq_metrics.loudness_zwtv(sig, fs, field_type="free")
 
     return loudness,t
 
@@ -241,7 +241,7 @@ def roughness_extraction(outpath, file_name):
     
     sig, fs = load(outpath + file_name + "_trim"+ ".wav")
 
-    roughness, r_spec, bark, time = roughness_dw(sig, fs, overlap=0)
+    roughness, r_spec, bark, time = sq_metrics.roughness_dw(sig, fs, overlap=0)
     
 
     return roughness,time
@@ -250,7 +250,8 @@ def roughness_extraction(outpath, file_name):
 
 def pitch_estimation(outpath, file_name,sr):
     print("Estimating Pitch...")
-    path = outpath + file_name + "_trim.wav"
+    #path = outpath + file_name + "_trim.wav"
+    path = outpath + file_name
 
     print('Estimating polyphone pitch using Deep Salience')
     task = "multif0"
